@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Distribution / packaging
+*.egg-info/
+
+# Environments
+.vscode/*
+
+# output
+logs/*
+_out/*
+out/*
+
+# test files
+test
+
+# res18 saved model files
+saved
+._*
+.DS_Store
