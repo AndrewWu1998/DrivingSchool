@@ -1,20 +1,29 @@
 import gym
 import time
 import numpy as np
+import pygame
 
 from DrivingSchool.src.ego_vehicle import EgoVehicle
 from DrivingSchool.src.pseudo_lidar import MapPseudoLidar
 
-MAX_STEER_RATE = 60
+MAX_STEER_RATE = 1
 
 DELTA_TIME = 0.01
 
 PI = 3.14
 
+RENDER_SCALE = 20
+
+COLOR_BUTTER_2 = pygame.Color(196, 160, 0)
+COLOR_ALUMINIUM_3 = pygame.Color(136, 138, 133)
+
 DEFAULT_CONFIG = {
     "scenarios": {
         "scenariosName": "straight_road" # straight_road corner_road s_road
     },
+    "env": {
+        "render": False
+    }
     "actors": {
         "vehicle_length": 4,
         "vehicle_width": 2
@@ -23,7 +32,7 @@ DEFAULT_CONFIG = {
 
 
 class StraightRoad:
-    def __init__(self, road_width=6.0, road_length=50.0):
+    def __init__(self, road_width=3.0, road_length=50.0):
         self.width = road_width
         self.length = road_length
         self.target = [self.width/2.0, self.length-5]
@@ -81,6 +90,7 @@ class DrivingSchoolEnv(gym.Env):
             configs = DEFAULT_CONFIG
 
         self.scenarios_name = configs["scenarios"]["scenariosName"]
+        self.env_configs = configs["env"]
         self.actor_configs = configs["actors"]
 
         self.observation_space = np.zeros(27)
@@ -92,6 +102,9 @@ class DrivingSchoolEnv(gym.Env):
         self.start_loc = None
         self.curr_measurement = None
         self.prev_measurement = None
+
+        self.display = None
+        self.pygame_clock = None
 
         self.reset()
         
@@ -105,7 +118,16 @@ class DrivingSchoolEnv(gym.Env):
             self.road = SnakeRoad()
         else:
             pass
-
+        
+        # pygame init
+        if self.env_configs["render"]:
+            pygame.init()
+            self.display = pygame.display.set_mode((int(self.road.width*RENDER_SCALE)*3, int(self.road.length*RENDER_SCALE)), pygame.HWSURFACE | pygame.DOUBLEBUF)
+            self.display.fill((0,0,0))
+            pygame.draw.rect(self.display, COLOR_ALUMINIUM_3, (self.road.width*RENDER_SCALE, 0, self.road.width*RENDER_SCALE, self.road.length*RENDER_SCALE), 0)
+            pygame.display.flip()
+            self.pygame_clock = pygame.time.Clock()
+        
         # 生成ego-vehicle
         self.start_loc = [self.road.width/2.0, self.actor_configs["vehicle_length"]/2.0+0.1]
         self.vehi = EgoVehicle(vehi_loc=self.start_loc, actor_config=self.actor_configs, delta_t=DELTA_TIME)
@@ -133,15 +155,20 @@ class DrivingSchoolEnv(gym.Env):
         for point in self.vehi.bbx:
             offroad = offroad or self.road.is_offroad(point[0], point[1])
 
-        low_speed = False
-        if self.curr_measurement["velocity"] < 0.1:
-            low_speed = True
+        low_speed_alongRoad = False
+        if self.vehi.velocity*np.cos(self.vehi.forward_azimuth) < 0.1:
+            low_speed_alongRoad = True
 
-        done = offroad or low_speed
+        wrong_direction = False
+        if abs(self.vehi.forward_azimuth) > 90:
+            wrong_direction = True
+
+        done = offroad or low_speed_alongRoad or wrong_direction
 
         self.curr_measurement["done"] = {
             "offroad": offroad,
-            "low_speed": low_speed
+            "low_speed_alongRoad": low_speed_alongRoad,
+            "wrong_direction": wrong_direction
         }
 
         return obs, reward, done, self.curr_measurement
@@ -152,7 +179,7 @@ class DrivingSchoolEnv(gym.Env):
         obs = road_pseudo_lidar_length_list
 
         measurements = {
-            "location": [self.vehi.loc.x, self.vehi.loc.y],
+            "location": [float(format(self.vehi.loc.x, '.4f')), float(format(self.vehi.loc.y, '.4f'))],
             "total_distance": np.sqrt((self.vehi.loc.x - self.start_loc[0])**2 + (self.vehi.loc.y - self.start_loc[1])**2),
             "velocity": self.vehi.velocity
         }
@@ -162,8 +189,19 @@ class DrivingSchoolEnv(gym.Env):
     def close(self):
         print("Close")
 
-    def render(self, mode='human'):
-        pass
+        if self.env_configs["render"]:
+            pygame.quit()
+
+    def render(self):
+        if self.env_configs["render"]:
+            self.pygame_clock.tick_busy_loop(60)
+            bbx_list = [(self.road.width*RENDER_SCALE+self.vehi.bbx[0][0]*RENDER_SCALE, self.vehi.bbx[0][1]*RENDER_SCALE), 
+                        (self.road.width*RENDER_SCALE+self.vehi.bbx[1][0]*RENDER_SCALE, self.vehi.bbx[1][1]*RENDER_SCALE), 
+                        (self.road.width*RENDER_SCALE+self.vehi.bbx[2][0]*RENDER_SCALE, self.vehi.bbx[2][1]*RENDER_SCALE), 
+                        (self.road.width*RENDER_SCALE+self.vehi.bbx[3][0]*RENDER_SCALE, self.vehi.bbx[3][1]*RENDER_SCALE)]
+            # pygame.draw.rect(self.display, COLOR_BUTTER_2, (self.road.width*RENDER_SCALE+self.vehi.bbx[3][0]*RENDER_SCALE, self.vehi.bbx[3][1]*RENDER_SCALE, self.vehi.width*RENDER_SCALE, self.vehi.length*RENDER_SCALE), 0)
+            pygame.draw.polygon(self.display, COLOR_BUTTER_2, bbx_list, 0)
+            pygame.display.flip()
 
 
 def __main__():
@@ -174,7 +212,7 @@ def __main__():
             print("\nEpisode %d:" % (ep))
             obs = env.reset()
 
-            action = [-1, 1]
+            action = [0, 0]
 
             start = time.time()
             i = 0
@@ -184,14 +222,16 @@ def __main__():
 
                 obs, reward, done, info = env.step(action)
                 
-                print(":{}\n\t".join(["Step#", "obs", "rew", "done", "info:{}"]).format(
-                    i, obs, reward, done, info))
-                # print("Step# ", i)
+                # print(":{}\n\t".join(["Step#", "obs", "rew", "done", "info:{}"]).format(
+                #     i, obs, reward, done, info))
+                print("Step# ", i)
 
-                if i > 1:
+                env.render()
+
+                if i > 0:
                     break
 
-            print("{} fps".format(i / (time.time() - start)))
+            # print("{} fps".format(i / (time.time() - start)))
     
     finally:
         env.close()

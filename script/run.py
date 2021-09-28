@@ -87,12 +87,11 @@ def main():
     # print(o)
     while True:
         a = net(o_torch).cpu().detach().numpy()
-        noise = np.random.normal(size=env.action_space.shape[0])
+        noise = np.clip(np.random.normal(size=env.action_space.shape[0]), -1., 1.)
         a += noise
 
         new_o, r, d, info = env.step(a)
         total_r += r
-        print(np.around(info["total_distance"], 2))
 
         o_torch = torch.as_tensor(new_o, dtype=torch.float32, device=device)
         buf.store(o, a, r, d)
@@ -106,7 +105,7 @@ def main():
         o = new_o
         # env.render()
         if d:
-            ep_r.append(total_r)
+            ep_r.append(info["total_distance"])
             total_r = 0
             o = env.reset()
             o_torch = torch.as_tensor(o, dtype=torch.float32, device=device)
