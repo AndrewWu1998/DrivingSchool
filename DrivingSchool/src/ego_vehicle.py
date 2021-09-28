@@ -22,6 +22,8 @@ class EgoVehicle:
         self.loc.y = self.loc.y + move_dis * np.cos(self.forward_azimuth)
         self.bbx = self.bbx + [move_dis * np.sin(self.forward_azimuth), move_dis * np.cos(self.forward_azimuth)]
 
+        return move_dis
+
     def rotate(self, theta):
         self.forward_azimuth += theta
         euler_matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])

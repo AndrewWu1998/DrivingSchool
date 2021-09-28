@@ -90,8 +90,9 @@ def main():
         noise = np.random.normal(size=env.action_space.shape[0])
         a += noise
 
-        new_o, r, d, _ = env.step(a)
+        new_o, r, d, info = env.step(a)
         total_r += r
+        print(np.around(info["total_distance"], 2))
 
         o_torch = torch.as_tensor(new_o, dtype=torch.float32, device=device)
         buf.store(o, a, r, d)
@@ -103,7 +104,7 @@ def main():
             ep_r = []
             print(ave_ep_r)
         o = new_o
-        env.render()
+        # env.render()
         if d:
             ep_r.append(total_r)
             total_r = 0

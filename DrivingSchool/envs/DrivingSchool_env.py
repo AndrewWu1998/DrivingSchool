@@ -81,11 +81,17 @@ class DrivingSchoolEnv(gym.Env):
             configs = DEFAULT_CONFIG
 
         self.scenarios_name = configs["scenarios"]["scenariosName"]
-
         self.actor_configs = configs["actors"]
+
+        self.observation_space = np.zeros(27)
+        self.action_space = np.zeros(2)
 
         self.road = None
         self.vehi = None
+        self.pseudo_lidar = None
+        self.start_loc = None
+        self.curr_measurement = None
+        self.prev_measurement = None
 
         self.reset()
         
@@ -101,12 +107,14 @@ class DrivingSchoolEnv(gym.Env):
             pass
 
         # 生成ego-vehicle
-        self.vehi = EgoVehicle(vehi_loc=[self.road.width/2.0, self.actor_configs["vehicle_length"]/2.0+0.1], actor_config=self.actor_configs, delta_t=DELTA_TIME)
+        self.start_loc = [self.road.width/2.0, self.actor_configs["vehicle_length"]/2.0+0.1]
+        self.vehi = EgoVehicle(vehi_loc=self.start_loc, actor_config=self.actor_configs, delta_t=DELTA_TIME)
 
         # 生成pseudo lidar
         self.pseudo_lidar = MapPseudoLidar(actor=self.vehi)
         
-        obs, _ = self.read_observation()
+        obs, measurement = self.read_observation()
+        self.prev_measurement = measurement
 
         return obs
 
@@ -115,23 +123,28 @@ class DrivingSchoolEnv(gym.Env):
         steer = float(np.clip(action[1], -1., 1.))
         
         self.vehi.rotate(np.radians(MAX_STEER_RATE*steer)) # 旋转
-        self.vehi.forward(throttle) # 平移
+        move_distance = self.vehi.forward(throttle) # 平移
 
-        obs, info = self.read_observation()
+        obs, self.curr_measurement = self.read_observation()
 
-        reward = None
+        reward = 0
 
-        done = None
+        done = False
+        for point in self.vehi.bbx:
+            done = done or self.road.is_offroad(point[0], point[1])
 
-        return obs, reward, done, info
+        return obs, reward, done, self.curr_measurement
     
     def read_observation(self):
         road_pseudo_lidar_length_list = self.pseudo_lidar.pseudo_road_lidar(self.road.road_shape)
 
         obs = road_pseudo_lidar_length_list
 
-        measurements = None
-
+        measurements = {
+            "location": [self.vehi.loc.x, self.vehi.loc.y],
+            "total_distance": np.sqrt((self.vehi.loc.x - self.start_loc[0])**2 + (self.vehi.loc.y - self.start_loc[1])**2)
+        }
+        
         return obs, measurements
 
     def close(self):
