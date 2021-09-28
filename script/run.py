@@ -1,10 +1,14 @@
 from numpy.core.numeric import _rollaxis_dispatcher
 import gym
+import os
+import time
 import numpy as np
 import torch
 from torch.optim import Adam
 import torch.nn as nn
 from DrivingSchool.envs.DrivingSchool_env import DrivingSchoolEnv
+
+MODEL_SAVE = '/home/carla/DrivingSchool/model'
 
 class buffer:
     def __init__(self, obs_dim, act_dim, size=30000, device='cpu'):
@@ -105,6 +109,8 @@ def main():
         o = new_o
         # env.render()
         if d:
+            if info["done"]["reach_goal"] is True:
+                torch.save(net.state_dict(), os.path.join(MODEL_SAVE, str(time.time())+'.pkl'))
             ep_r.append(info["total_distance"])
             total_r = 0
             o = env.reset()

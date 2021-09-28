@@ -23,7 +23,7 @@ DEFAULT_CONFIG = {
     },
     "env": {
         "render": False
-    }
+    },
     "actors": {
         "vehicle_length": 4,
         "vehicle_width": 2
@@ -163,12 +163,17 @@ class DrivingSchoolEnv(gym.Env):
         if abs(self.vehi.forward_azimuth) > 90:
             wrong_direction = True
 
-        done = offroad or low_speed_alongRoad or wrong_direction
+        reach_goal = False
+        if np.sqrt((self.vehi.loc.x-self.road.target[0])**2 + (self.vehi.loc.y-self.road.target[1])**2) < 1:
+            reach_goal = True
+
+        done = offroad or low_speed_alongRoad or wrong_direction or reach_goal
 
         self.curr_measurement["done"] = {
             "offroad": offroad,
             "low_speed_alongRoad": low_speed_alongRoad,
-            "wrong_direction": wrong_direction
+            "wrong_direction": wrong_direction,
+            "reach_goal": reach_goal
         }
 
         return obs, reward, done, self.curr_measurement
@@ -199,7 +204,6 @@ class DrivingSchoolEnv(gym.Env):
                         (self.road.width*RENDER_SCALE+self.vehi.bbx[1][0]*RENDER_SCALE, self.vehi.bbx[1][1]*RENDER_SCALE), 
                         (self.road.width*RENDER_SCALE+self.vehi.bbx[2][0]*RENDER_SCALE, self.vehi.bbx[2][1]*RENDER_SCALE), 
                         (self.road.width*RENDER_SCALE+self.vehi.bbx[3][0]*RENDER_SCALE, self.vehi.bbx[3][1]*RENDER_SCALE)]
-            # pygame.draw.rect(self.display, COLOR_BUTTER_2, (self.road.width*RENDER_SCALE+self.vehi.bbx[3][0]*RENDER_SCALE, self.vehi.bbx[3][1]*RENDER_SCALE, self.vehi.width*RENDER_SCALE, self.vehi.length*RENDER_SCALE), 0)
             pygame.draw.polygon(self.display, COLOR_BUTTER_2, bbx_list, 0)
             pygame.display.flip()
 
