@@ -5,7 +5,7 @@ class EgoVehicle:
         self.length = actor_config["vehicle_length"]
         self.width = actor_config["vehicle_width"]
         self.loc = Location(vehi_loc[0], vehi_loc[1])
-        self.velocity = 0
+        self.velocity = 0.
         self.forward_azimuth = 0 # ego的朝向，单位: 度
 
         self.bbx = np.zeros((4, 2))
@@ -17,7 +17,8 @@ class EgoVehicle:
         self.delta_t = delta_t
     
     def forward(self, throttle):
-        move_dis = (self.velocity + throttle) * self.delta_t
+        self.velocity = self.velocity + throttle
+        move_dis = self.velocity * self.delta_t
         self.loc.x = self.loc.x + move_dis * np.sin(self.forward_azimuth)
         self.loc.y = self.loc.y + move_dis * np.cos(self.forward_azimuth)
         self.bbx = self.bbx + [move_dis * np.sin(self.forward_azimuth), move_dis * np.cos(self.forward_azimuth)]

@@ -129,9 +129,20 @@ class DrivingSchoolEnv(gym.Env):
 
         reward = 0
 
-        done = False
+        offroad = False
         for point in self.vehi.bbx:
-            done = done or self.road.is_offroad(point[0], point[1])
+            offroad = offroad or self.road.is_offroad(point[0], point[1])
+
+        low_speed = False
+        if self.curr_measurement["velocity"] < 0.1:
+            low_speed = True
+
+        done = offroad or low_speed
+
+        self.curr_measurement["done"] = {
+            "offroad": offroad,
+            "low_speed": low_speed
+        }
 
         return obs, reward, done, self.curr_measurement
     
@@ -142,7 +153,8 @@ class DrivingSchoolEnv(gym.Env):
 
         measurements = {
             "location": [self.vehi.loc.x, self.vehi.loc.y],
-            "total_distance": np.sqrt((self.vehi.loc.x - self.start_loc[0])**2 + (self.vehi.loc.y - self.start_loc[1])**2)
+            "total_distance": np.sqrt((self.vehi.loc.x - self.start_loc[0])**2 + (self.vehi.loc.y - self.start_loc[1])**2),
+            "velocity": self.vehi.velocity
         }
         
         return obs, measurements

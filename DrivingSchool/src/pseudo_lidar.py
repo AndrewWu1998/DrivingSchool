@@ -6,7 +6,7 @@ import numpy as np
 import random
 import copy
 
-PSEUDO_LIDAR_RAY_MAX_LENGTH = 3
+PSEUDO_LIDAR_RAY_MAX_LENGTH = 10
 
 class PseudoLidarRay:
     def __init__(self, start, theta):
